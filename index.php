@@ -1,49 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <title>AMSAT Telemetry Leaderboard Map</title>
-    <!-- The line below is only needed for old environments like Internet Explorer and Android 4.x -->
-    <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=fetch,requestAnimationFrame,Element.prototype.classList,URL"></script>
-    <script src="include/jquery.js"></script>
-    <script src="include/ol.js"></script>
-    <link rel="stylesheet" href="include/ol.css">
-    <style>
-      .map {
-        width: 100%;
-        height:800px;
-      }
-    </style>
-    <script type="application/javascript">
+<?php
 
-    jQuery(document).ready(function() {
-        init_amsat_ground_station_map(jQuery("#spacecraft").val(), jQuery("#last_x").val());
+use \Psr\Http\Message\ServerRequestInterface as Request;
+use \Psr\Http\Message\ResponseInterface as Response;
+use Slim\Factory\AppFactory;
+use Slim\Routing\RouteCollectorProxy;
+use Slim\Views\Twig;
+use Slim\Views\TwigMiddleware;
 
-        jQuery("#btnUpdateMap").click(function() {
-            update_amsat_ground_station_map(jQuery("#spacecraft").val(), jQuery("#last_x").val());
-        });
+require __DIR__.'/vendor/autoload.php';
+
+$subdir = substr(__DIR__, strlen($_SERVER['DOCUMENT_ROOT']));
+
+$app = AppFactory::create();
+//$app->addRoutingMiddleware();
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
+
+$twig = Twig::create(__DIR__.'/view');
+$twig->getEnvironment()->addGlobal('subdir', $subdir);
+$app->add(TwigMiddleware::create($app, $twig));
+
+$app->group($subdir, function(RouteCollectorProxy $r) {
+    $r->get('/', function(Request $request, Response $response, array $args) {
+        $view = Twig::fromRequest($request);
+        return $view->render($response, 'index.html');
     });
 
-    </script>
-  </head>
-  <body>
-    <div id="control_panel">
-     <b>Spacecraft</b>
-     <select id="spacecraft">
-      <option value="1">Fox-1A (AO-85)</option>
-      <option value="2" selected>Fox-1B (AO-91)</option>
-      <option value="3">Fox-1Cliff (AO-95)</option>
-      <option value="4">Fox-1D (AO-92)</option>
-      <option value="6">HuskySat-1</option>
-     </select>
-     <b>Show Data For Last </b>
-     <select id="last_x">
-      <option value="-90 minutes">90 Minutes</option>
-      <option value="-24 hours">24 Hours</option>
-      <option value="-30 days">30 days</option>
-     </select>
-     <input type="button" id="btnUpdateMap" value="Update" />
-    </div>
-    <div id="map" class="map"></div>
-    <script src="index.js"></script>
-  </body>
-</html>
+    $r->get('/map/{name}', function (Request $request, Response $response, array $args) {
+        $name = $args['name'];
+
+        if(!in_array($name, ['rx-ground-stations', 'ground-station-passes'])) {
+            print("<b>ERROR: Invalid Map Name</b>");
+            die();
+        }
+
+        $view = Twig::fromRequest($request);
+
+        return $view->render($response, 'map.html', ['name' => $name]);
+    });
+
+    $r->post('/map/api/rx-ground-stations', function (Request $request, Response $response, array $args) {
+        $conn_mgr = new \Amsat\FoxDb\ConnectionManager();
+        $lb = new \Amsat\Telemetry\LeaderBoard($conn_mgr, true);
+
+        $last_x     = $_REQUEST['last_x'];
+        $spacecraft = $_REQUEST['spacecraft'];
+
+        if(!in_array($last_x, ['-90 minutes', '-24 hours', '-30 days'])) {
+            $response = ['status' => 'error', 'error' => 'Invalid last_x'];
+        } elseif($spacecraft < 0 || $spacecraft > 6) {
+            $response = ['status' => 'error', 'error' => 'Invalid spacecraft'];
+        } else {
+            $start = clone $lb->getDefaultEndDateTime();
+            $start->modify($last_x);
+
+            $result = $lb->groundStationMapSearch($spacecraft, $start);
+        }
+
+        $response->getBody()->write(json_encode($result));
+        return $response->withHeader('Content-Type', 'application/json');
+    });
+});
+
+$app->run();
+
+

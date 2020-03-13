@@ -47,7 +47,7 @@ class LeaderBoard {
         return $header_count + $archive_count;
     }
 
-    public function passMapSearch($spacecraft, \DateTime $start, \DateTime $end=null) {
+    public function groundStationMapSearch($spacecraft, \DateTime $start, \DateTime $end=null) {
         if($end == null) {
             $end = $this->getDefaultEndDateTime();
         }

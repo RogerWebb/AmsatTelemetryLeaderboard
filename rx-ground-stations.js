@@ -42,7 +42,7 @@ function parse_amsat_map_ajax_result(data) {
 
 function init_amsat_ground_station_map(spacecraft, last_x) {
     jQuery.ajax({
-        url: "map_ajax.php", 
+        url: "api/rx-ground-stations", 
         method: 'POST',
         data: {
             'spacecraft': spacecraft,
@@ -58,7 +58,7 @@ function init_amsat_ground_station_map(spacecraft, last_x) {
 
 function update_amsat_ground_station_map(spacecraft, last_x) {
    jQuery.ajax({
-        url: "map_ajax.php", 
+        url: "api/rx-ground-stations", 
         method: 'POST',
         data: {
             'last_x':     last_x,

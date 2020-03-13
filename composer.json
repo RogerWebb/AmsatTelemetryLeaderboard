@@ -3,5 +3,10 @@
         "psr-0": {
             "Amsat\\": "src/"
         }
+    },
+    "require": {
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.0",
+        "slim/twig-view": "^3.0"
     }
 }
